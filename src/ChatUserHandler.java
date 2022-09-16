@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * This is a handler for a chat-room user.
@@ -10,24 +11,24 @@ import java.util.*;
  * @Date 2022/9/14
  **/
 public class ChatUserHandler implements Runnable {
+    Logger logger = Logger.getLogger("ChatUserHandler");
     private final User user;
     private final HashMap<UUID, User> onSiteUser;
     private final HashMap<UUID, UUID> chatSession;
     private final HashMap<String, UUID> nameIdMap;
-    private final HashMap<UUID, Deque<String>> messageQ;
     private boolean exited = false;
 
 
-    public ChatUserHandler(User user, HashMap<UUID, User> onSiteUser, HashMap<UUID, UUID> chatSession, HashMap<String, UUID> nameIdMap, HashMap<UUID, Deque<String>> messageQ) {
+    public ChatUserHandler(User user, HashMap<UUID, User> onSiteUser, HashMap<UUID, UUID> chatSession, HashMap<String, UUID> nameIdMap) {
         this.user = user;
         this.onSiteUser = onSiteUser;
         this.chatSession = chatSession;
         this.nameIdMap = nameIdMap;
-        this.messageQ = messageQ;
     }
 
     @Override
     public void run() {
+        logger.info("current thread is " + Thread.currentThread().getName());
         Socket incoming = user.getSocket();
         try (InputStream inStream = incoming.getInputStream();
              OutputStream outStream = incoming.getOutputStream();
@@ -37,38 +38,31 @@ public class ChatUserHandler implements Runnable {
             // server said one sentence, then server read one sentence from client
             String response = "Welcome to chat room, please input your name first, or you can Enter '@Exit' to disconnect at any time.";
             String request = "";
+            logger.info("exited is " + exited);
             while (!exited) {
                 if (!response.equals("")) {
                     out.println(response);
                     response = "";
                 }
-                else if (messageQ.get(user.getUserId()) != null) {
-                    System.out.println("I'm " + user.getName() + ", id=" + user.getUserId());
-                    Deque<String> msgQ = messageQ.get(user.getUserId());
-                    String receiveMsg = msgQ.removeFirst();
-                    out.println(receiveMsg);
-                }
-                System.out.println("begin in.hasNextLine");
                 if (in.hasNextLine()) {
                     request = in.nextLine();
-                    System.out.println("request: " + request);
+                    logger.info("read request: " + request);
                     if (user.getName().equals("")) {
                         if (isValidName(request)) {
                             user.setName(request);
                             nameIdMap.put(user.getName(), user.getUserId());
-                            System.out.println("User " + user.getName() + ": " + user.getUserId() + " login!"); // for debug
+                            logger.info("User " + user.getName() + ": " + user.getUserId() + " login!");
                             response = "Welcome " + user.getName() + ", now you can enter @List to see which one to talk?";
                         } else {
                             response = "Invalid name, please try another name: ";
                         }
                     } else {
-                        System.out.println("handleRequest " + request);
+                        logger.info("handleRequest " + request);
                         response = handleRequest(request);
                     }
                 }
-                System.out.println("after in.hasNextLine " + response);
             }
-            System.out.println("incoming.close()");
+            logger.info("incoming.close()");
             incoming.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -93,10 +87,17 @@ public class ChatUserHandler implements Runnable {
                 // transfer msg to To user
                 UUID toId = chatSession.get(user.getUserId());
                 if (onSiteUser.containsKey(toId)) {
+                    User toUser = onSiteUser.get(toId);
                     response = "From " + user.getName() + ": " + msg;
-                    System.out.println(response);
-                    Deque<String> msgQ = messageQ.computeIfAbsent(toId, k -> new LinkedList<>());
-                    msgQ.addLast(response);
+                    logger.info("transfer response: [" + response + "] to " + toUser.getName());
+                    Socket toSocket = toUser.getSocket();
+                    // TODO: socket 只能被一处持有？这里写了第一次后，再次调用会报 SocketException: Socket is closed
+                    try {
+                        PrintWriter out = new PrintWriter(new OutputStreamWriter(toSocket.getOutputStream(), "UTF-8"), true);
+                        out.println(response);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                     response = "";
                 }
             } catch (Exception e) {
@@ -151,16 +152,16 @@ public class ChatUserHandler implements Runnable {
 
     private boolean isValidName(String name) {
         if (name == null || name.length() == 0) {
-//            System.out.println("name is empty!");  // for debug
+            logger.info("name is empty!");
             return false;
         }
         // invalid name, because @ is a command starter
         if (name.trim().startsWith("@")) {
-//            System.out.println("'@' is a command starter, please don't start from '@'");  // for debug
+            logger.info("'@' is a command starter, please don't start from '@'");
             return false;
         }
         if (isRepeatedName(name)) {
-//            System.out.println("There is already a user named " + name);  // for debug
+            logger.info("There is already a user named " + name);
             return false;
         }
         return true;
@@ -169,7 +170,7 @@ public class ChatUserHandler implements Runnable {
     private boolean isRepeatedName(String name) {
         UUID id = nameIdMap.get(name);
         if (id == null) return false;
-        System.out.println("!onSiteUser.containsKey(id): " + !onSiteUser.containsKey(id));
+        logger.info("!onSiteUser.containsKey(id): " + !onSiteUser.containsKey(id));
         return onSiteUser.containsKey(id);
     }
 }

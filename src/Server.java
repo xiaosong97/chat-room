@@ -1,10 +1,8 @@
 import java.io.*;
 import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * The server
@@ -14,18 +12,17 @@ import java.util.concurrent.ThreadPoolExecutor;
  **/
 public class Server {
     public static final int CHAT_SERVER_PORT = 9189;
-    private HashMap<UUID, User> onSiteUser = new HashMap<>();
-    private HashMap<UUID, UUID> chatSession = new HashMap<>();
-    private HashMap<String, UUID> nameIdMap = new HashMap<>();
-    private final HashMap<UUID, Deque<String>> messageQ = new HashMap<>();
-    private ExecutorService pool = Executors.newFixedThreadPool(10);
+    private final HashMap<UUID, User> onSiteUser = new HashMap<>();
+    private final HashMap<UUID, UUID> chatSession = new HashMap<>();
+    private final HashMap<String, UUID> nameIdMap = new HashMap<>();
+    private final ExecutorService pool = Executors.newFixedThreadPool(10);
 
     public void runServer() {
         try (ServerSocket s = new ServerSocket(CHAT_SERVER_PORT)) {
             while (true) {
                 User user = new User(s.accept());
                 onSiteUser.put(user.getUserId(), user);
-                ChatUserHandler handler = new ChatUserHandler(user, onSiteUser, chatSession, nameIdMap, messageQ);
+                ChatUserHandler handler = new ChatUserHandler(user, onSiteUser, chatSession, nameIdMap);
                 pool.submit(handler);
             }
         } catch (IOException e) {
@@ -37,5 +34,4 @@ public class Server {
         Server server = new Server();
         server.runServer();
     }
-
 }

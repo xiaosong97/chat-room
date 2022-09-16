@@ -33,7 +33,8 @@
 - The server will maintain a chat session list which include <from, to> info for user chat.
 
 <h2>class define</h2>
-User:<br>
+
+User:
 - userId
 - userName
 - socket

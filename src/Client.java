@@ -3,6 +3,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The client agent
@@ -11,6 +13,7 @@ import java.util.Scanner;
  * @Date 2022/9/14
  **/
 public class Client {
+    Logger logger = Logger.getLogger("Client");
     private Socket socket;
     private Scanner in;
     private BufferedReader reader;
@@ -18,13 +21,13 @@ public class Client {
 
     public void chatRequest() throws IOException {
         try {
-            socket = new Socket(InetAddress.getLocalHost(), Server.CHAT_SERVER_PORT);
+            socket = new Socket("localhost", Server.CHAT_SERVER_PORT);
             in = new Scanner(socket.getInputStream(), "UTF-8");
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
             out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true);
 
             Thread read = new Thread(() -> {
-                System.out.println("begin read thread.");
+                logger.info("begin read thread.");
                 while (true) {
                     try {
                         String msg = null;
@@ -32,9 +35,10 @@ public class Client {
 //                            msg = in.nextLine();
                             msg = reader.readLine();
                             if (msg != null && msg.length() > 0) {
+                                logger.info("receive msg: " + msg);
                                 System.out.println(msg);
                                 if (msg.equalsIgnoreCase("From Server: bye")) {
-                                    System.out.println("end read thread.");
+                                    logger.info("end read thread.");
                                     close();
                                     System.exit(0);
                                 }
@@ -52,17 +56,17 @@ public class Client {
 
             Thread write = new Thread(() -> {
                 Scanner inUser = new Scanner(System.in);
-                System.out.println("begin write thread.");
+                logger.info("begin write thread.");
                 while (inUser.hasNextLine()) {
                     String request = inUser.nextLine();
                     out.println(request);
-                    System.out.println("request: " + request);
-                    if (inUser.nextLine().equalsIgnoreCase("@Exit")) {
+                    logger.info("write request: " + request);
+                    if (request.equalsIgnoreCase("@Exit")) {
                         close();
                         break;
                     }
                 }
-                System.out.println("end write thread.");
+                logger.info("end write thread.");
             });
             write.start();
         } catch (IOException e) {
