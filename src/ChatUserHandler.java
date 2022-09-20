@@ -91,7 +91,6 @@ public class ChatUserHandler implements Runnable {
                     response = "From " + user.getName() + ": " + msg;
                     logger.info("transfer response: [" + response + "] to " + toUser.getName());
                     Socket toSocket = toUser.getSocket();
-                    // TODO: socket 只能被一处持有？这里写了第一次后，再次调用会报 SocketException: Socket is closed
                     try {
                         PrintWriter out = new PrintWriter(new OutputStreamWriter(toSocket.getOutputStream(), "UTF-8"), true);
                         out.println(response);
@@ -140,6 +139,7 @@ public class ChatUserHandler implements Runnable {
                     response = "User " + toName + " does not exist!";
                 } else {
                     chatSession.put(user.getUserId(), toId);
+                    chatSession.put(toId, user.getUserId());
                     response = "You will chat with " + toName + " until you change to another user.";
                 }
             } catch (Exception e) {
